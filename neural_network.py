@@ -122,7 +122,10 @@ class NeuralNetwork:
     def backpropogate(self, prediction, target):
         delta_values  = []
         for layer in reversed(range(1, len(self.neuronLayers))):
-            pass
+            if type(layer) == OutputLayer:
+                pass
+            elif type(layer) == MiddleLayer:
+                pass
 
 def sigmoid(arr):
     arr = arr.flatten()
