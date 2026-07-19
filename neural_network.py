@@ -107,23 +107,15 @@ class NeuralNetwork:
         return nextInput
 
     def loss(self, prediction, target):
-        if type(target) == Matrix:
-            if prediction.dim != target.dim:
-                raise ValueError("Prediction and target must have the same dimensions for loss calculation.")
-            loss_values = []
-            for i in range(prediction.dim[0]):
-                loss_values.append((target.matrix[i][0]*math.log(prediction.matrix[i][0])))
-            return -1 * sum(loss_values)
-        elif type(target) == int:
-            if target < 0 or target >= prediction.dim[0]:
-                raise ValueError("Target index is out of bounds for the prediction matrix.")
-            return -1 * math.log(prediction.matrix[target][0])
+        if target < 0 or target >= prediction.dim[0]:
+            raise ValueError("Target index is out of bounds for the prediction matrix.")
+        return -1 * math.log(prediction.matrix[target][0])
     
     def backpropogate(self, prediction, target):
         delta_values  = []
         for layer in reversed(range(1, len(self.neuronLayers))):
             if type(layer) == OutputLayer:
-                pass
+                delta_values.append(prediction - Matrix(f"{prediction.dim[0]}x1", *[1 if i == target else 0 for i in range(prediction.dim[0])]))
             elif type(layer) == MiddleLayer:
                 pass
 
