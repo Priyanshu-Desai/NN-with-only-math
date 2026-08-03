@@ -1,6 +1,8 @@
 import math
 import random
 
+
+# matrix maths
 class Matrix:
     def __init__(self, dim, *nums):
         rows, cols = dim.split('x')
@@ -62,10 +64,19 @@ class Matrix:
             raise ValueError("Matrix must be a column vector (n x 1) to flatten.")
         return [item for sublist in self.matrix for item in sublist]
 
+    def transpose(self):
+        transposed_values = []
+        for j in range(self.dim[1]):
+            for i in range(self.dim[0]):
+                transposed_values.append(self.matrix[i][j])
+        return Matrix(f"{self.dim[1]}x{self.dim[0]}", *transposed_values)
+
+# nn layers
 class Layer:
     def __init__(self, neurons):
         self.neuronWeights = Matrix(f"{neurons}x1", *[random.uniform(-1, 1) for _ in range(neurons)])
-        
+
+# nn layer types
 class InputLayer(Layer):
     def __init__(self, neurons):
         super().__init__(neurons)
@@ -86,6 +97,7 @@ class WeightLayer:
     def __init__(self, inputLayer, outputLayer):
         self.weights = Matrix(f"{outputLayer.neuronWeights.dim[0]}x{inputLayer.neuronWeights.dim[0]}", *[random.uniform(-1, 1) for _ in range(outputLayer.neuronWeights.dim[0] * inputLayer.neuronWeights.dim[0])])
 
+# the nn
 class NeuralNetwork:
     def __init__(self, *layers):
         self.neuronLayers = []
@@ -99,11 +111,12 @@ class NeuralNetwork:
             elif layer[0] == 'output':
                 self.weightLayers.append(WeightLayer(self.neuronLayers[-1], OutputLayer(layer[1])))
                 self.neuronLayers.append(OutputLayer(layer[1]))
-        
+        self.layerOutputs = []
     def forward(self):
         nextInput = self.neuronLayers[0].neuronWeights
         for i in range(1, len(self.neuronLayers)):
             nextInput = self.neuronLayers[i].activationFunction(self.weightLayers[i] * nextInput + self.neuronLayers[i].neuronBiases)
+            self.layerOutputs.append(nextInput)
         return nextInput
 
     def loss(self, prediction, target):
@@ -117,7 +130,14 @@ class NeuralNetwork:
             if type(layer) == OutputLayer:
                 delta_values.append(prediction - Matrix(f"{prediction.dim[0]}x1", *[1 if i == target else 0 for i in range(prediction.dim[0])]))
             elif type(layer) == MiddleLayer:
-                pass
+                # find the delta value for a middle layer that uses sigmoid activation function
+                prev_delta = delta_values[-1]
+                prev_weights = self.weightLayers[layer + 1].weights
+                layer_output = self.layerOutputs[layer - 1]
+                delta = (prev_weights.transpose() * prev_delta)*sigmoid_derivative(layer_output)
+                delta_values.append(delta)
+        delta_values.reverse()
+
 
 def sigmoid(arr):
     arr = arr.flatten()
@@ -132,6 +152,3 @@ def softmax(arr):
 def sigmoid_derivative(arr):
     arr = arr.flatten()
     return Matrix(f"{len(arr)}x1", *[x * (1 - x) for x in arr])
-
-def softmax_derivative(arr):
-    pass
