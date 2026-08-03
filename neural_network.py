@@ -43,7 +43,7 @@ class Matrix:
         result = Matrix(f"{self.dim[0]}x{self.dim[1]}", *resValues)
         return result
 
-    def __mul__(self, other):
+    def __matmul__(self, other):
         if self.dim[1] != other.dim[0]:
             raise ValueError("Number of columns in the first matrix must be equal to the number of rows in the second matrix for multiplication.")
         resValues = []
@@ -70,6 +70,16 @@ class Matrix:
             for i in range(self.dim[0]):
                 transposed_values.append(self.matrix[i][j])
         return Matrix(f"{self.dim[1]}x{self.dim[0]}", *transposed_values)
+
+    def __mul__(self, other):
+        if self.dim != other.dim:
+            raise ValueError("Matrices must have the same dimensions for Hadamard product.")
+        resValues = []
+        for i in range(self.dim[0]):
+            for j in range(self.dim[1]):
+                resValues.append(self.matrix[i][j] * other.matrix[i][j])
+        result = Matrix(f"{self.dim[0]}x{self.dim[1]}", *resValues)
+        return result
 
 # nn layers
 class Layer:
@@ -115,7 +125,7 @@ class NeuralNetwork:
     def forward(self):
         nextInput = self.neuronLayers[0].neuronWeights
         for i in range(1, len(self.neuronLayers)):
-            nextInput = self.neuronLayers[i].activationFunction(self.weightLayers[i] * nextInput + self.neuronLayers[i].neuronBiases)
+            nextInput = self.neuronLayers[i].activationFunction(self.weightLayers[i] @ nextInput + self.neuronLayers[i].neuronBiases)
             self.layerOutputs.append(nextInput)
         return nextInput
 
@@ -134,7 +144,7 @@ class NeuralNetwork:
                 prev_delta = delta_values[-1]
                 prev_weights = self.weightLayers[layer + 1].weights
                 layer_output = self.layerOutputs[layer - 1]
-                delta = (prev_weights.transpose() * prev_delta)*sigmoid_derivative(layer_output)
+                delta = (prev_weights.transpose() @ prev_delta) * sigmoid_derivative(layer_output)
                 delta_values.append(delta)
         delta_values.reverse()
 
