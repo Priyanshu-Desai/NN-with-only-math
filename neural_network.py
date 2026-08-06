@@ -1,8 +1,13 @@
 import math
 import random
 
+# Simple neural network implemented using only math and basic data structures.
+# Provides a lightweight Matrix helper class, simple layer types, and a
+# `NeuralNetwork` implementation with forward and backward passes for
+# educational and demonstration purposes.
 
-# matrix maths
+# Matrix maths: lightweight matrix class providing basic operations used
+# throughout the neural network (addition, subtraction, matmul, elementwise).
 class Matrix:
     def __init__(self, dim, *nums):
         rows, cols = dim.split('x')
@@ -90,7 +95,11 @@ class Matrix:
         return result
 
 # nn layers
-# nn layer types
+    # Neural network layer types
+    # - `InputLayer`: holds input neuron values (stored in `neuronBiases` as a column vector)
+    # - `MiddleLayer`: hidden layer with an activation function (sigmoid) and biases
+    # - `OutputLayer`: final layer with `softmax` activation and biases
+    # - `WeightLayer`: stores the weights matrix connecting two neuron layers
 class InputLayer():
     def __init__(self, neurons):
         self.neuronBiases = Matrix(f"{neurons}x1", *[0 for _ in range(neurons)])
@@ -106,10 +115,13 @@ class OutputLayer():
         self.neuronBiases = Matrix(f"{neurons}x1", *biases)
 
 class WeightLayer:
-    def __init__(self, inputLayer, outputLayer, *weights):
-        self.weights = Matrix(f"{outputLayer.neuronBiases.dim[0]}x{inputLayer.neuronBiases.dim[0]}", *weights)
+    def __init__(self, rows, cols, *weights):
+        self.weights = Matrix(f"{rows}x{cols}", *weights)
 
-# the nn
+# The `NeuralNetwork` class builds a network from a layer configuration
+# and provides methods to set inputs, run a forward pass, compute loss,
+# backpropagate errors, compute gradients, update weights, and serialize
+# the network to a simple dictionary structure.
 class NeuralNetwork:
     # JSON input
     # {
@@ -131,6 +143,11 @@ class NeuralNetwork:
     def __init__(self, layerConfig):
         self.neuronLayers = []
         self.weightLayers = [None]
+
+        if isinstance(layerConfig, dict):
+            sorted_keys = sorted(layerConfig.keys(), key=int)
+            layerConfig = [layerConfig[key] for key in sorted_keys]
+
         for layer in layerConfig:
             layerType = layer['type']
             layerSize = layer['size'] if 'size' in layer else None
@@ -183,40 +200,41 @@ class NeuralNetwork:
         return self.delta_values
 
     def gradients(self):
-        gradients = []
+        weight_gradients = []
+        bias_gradients = self.delta_values
         for layer in range(1, len(self.neuronLayers)):
             gradient = self.delta_values[layer - 1] @ self.layerOutputs[layer - 1].transpose()
-            gradients.append(gradient)
-        return gradients
+            weight_gradients.append(gradient)
+        return (weight_gradients, bias_gradients)
 
-    def update_weights(self, gradients, learning_rate):
+    def update_weights(self, weight_gradients, bias_gradients, learning_rate):
         for layer in range(1, len(self.neuronLayers)):
-            self.weightLayers[layer].weights = self.weightLayers[layer].weights - gradients[layer - 1].scalar_multiply(learning_rate)
-            self.neuronLayers[layer].neuronBiases = self.neuronLayers[layer].neuronBiases - self.delta_values[layer - 1].scalar_multiply(learning_rate)
+            self.weightLayers[layer].weights = self.weightLayers[layer].weights - weight_gradients[layer - 1].scalar_multiply(learning_rate)
+            self.neuronLayers[layer].neuronBiases = self.neuronLayers[layer].neuronBiases - bias_gradients[layer - 1].scalar_multiply(learning_rate)
 
     def save(self):
         data = {}
         for i, layer in enumerate(self.neuronLayers):
             if isinstance(layer, InputLayer):
-                data[i] = {
+                data[2*i] = {
                     'type': 'input',
                     'size': layer.neuronBiases.dim[0],
                     'biases': layer.neuronBiases.flatten()
                 }
             elif isinstance(layer, MiddleLayer):
-                data[i] = {
+                data[2*i] = {
                     'type': 'middle',
                     'size': layer.neuronBiases.dim[0],
                     'biases': layer.neuronBiases.flatten()
                 }
             elif isinstance(layer, OutputLayer):
-                data[i] = {
+                data[2*i] = {
                     'type': 'output',
                     'size': layer.neuronBiases.dim[0],
                     'biases': layer.neuronBiases.flatten()
                 }
         for i, weight_layer in enumerate(self.weightLayers[1:], start=1):
-            data[i] = {
+            data[2*i-1] = {
                 'type': 'weight',
                 'size': [weight_layer.weights.dim[0], weight_layer.weights.dim[1]],
                 'weights': weight_layer.weights.flatten()
@@ -224,16 +242,20 @@ class NeuralNetwork:
         return data
 
 
+# Activation functions and derivatives used by layers:
+# `sigmoid` - logistic activation applied element-wise.
 def sigmoid(arr):
     arr = arr.flatten()
     return Matrix(f"{len(arr)}x1", *[1/(1+math.exp(-x)) for x in arr])
 
+# `softmax` - converts raw scores into probabilities that sum to 1.
 def softmax(arr):
     arr = arr.flatten()
     exp = [math.exp(x) for x in arr]
     sum_exp = sum(exp)
     return Matrix(f"{len(arr)}x1", *[x / sum_exp for x in exp])
 
+# `sigmoid_derivative` - derivative of the sigmoid given sigmoid outputs.
 def sigmoid_derivative(arr):
     arr = arr.flatten()
     return Matrix(f"{len(arr)}x1", *[x * (1 - x) for x in arr])
