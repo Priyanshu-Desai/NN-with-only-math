@@ -81,31 +81,33 @@ class Matrix:
                 transposed_values.append(self.matrix[i][j])
         return Matrix(f"{self.dim[1]}x{self.dim[0]}", *transposed_values)   
 
+    def scalar_multiply(self, scalar):
+        resValues = []
+        for i in range(self.dim[0]):
+            for j in range(self.dim[1]):
+                resValues.append(self.matrix[i][j] * scalar)
+        result = Matrix(f"{self.dim[0]}x{self.dim[1]}", *resValues)
+        return result
+
 # nn layers
-class Layer:
-    def __init__(self, neurons):
-        self.neuronWeights = Matrix(f"{neurons}x1", *[random.uniform(-1, 1) for _ in range(neurons)])
-
 # nn layer types
-class InputLayer(Layer):
+class InputLayer():
     def __init__(self, neurons):
-        super().__init__(neurons)
+        self.neuronBiases = Matrix(f"{neurons}x1", *[0 for _ in range(neurons)])
 
-class MiddleLayer(Layer):
+class MiddleLayer():
     def __init__(self, neurons):
-        super().__init__(neurons)
         self.activationFunction = sigmoid
         self.neuronBiases = Matrix(f"{neurons}x1", *[random.uniform(-1, 1) for _ in range(neurons)])
 
-class OutputLayer(Layer):
+class OutputLayer():
     def __init__(self, neurons):
-        super().__init__(neurons)
         self.activationFunction = softmax
         self.neuronBiases = Matrix(f"{neurons}x1", *[random.uniform(-1, 1) for _ in range(neurons)])
 
 class WeightLayer:
     def __init__(self, inputLayer, outputLayer):
-        self.weights = Matrix(f"{outputLayer.neuronWeights.dim[0]}x{inputLayer.neuronWeights.dim[0]}", *[random.uniform(-1, 1) for _ in range(outputLayer.neuronWeights.dim[0] * inputLayer.neuronWeights.dim[0])])
+        self.weights = Matrix(f"{outputLayer.neuronBiases.dim[0]}x{inputLayer.neuronBiases.dim[0]}", *[random.uniform(-1, 1) for _ in range(outputLayer.neuronBiases.dim[0] * inputLayer.neuronBiases.dim[0])])
 
 # the nn
 class NeuralNetwork:
@@ -122,13 +124,22 @@ class NeuralNetwork:
                 self.weightLayers.append(WeightLayer(self.neuronLayers[-1], OutputLayer(layer[1])))
                 self.neuronLayers.append(OutputLayer(layer[1]))
         self.layerOutputs = []
+        self.delta_values = []
+
+
+    def setInput(self, inputValues):
+        if len(inputValues) != self.neuronLayers[0].neuronBiases.dim[0]:
+            raise ValueError("Input values must match the number of neurons in the input layer.")
+        self.neuronLayers[0].neuronBiases = Matrix(f"{len(inputValues)}x1", *inputValues)
+        self.layerOutputs = [self.neuronLayers[0].neuronBiases]
 
     def forward(self):
-        nextInput = self.neuronLayers[0].neuronWeights
+        self.layerOutputs = [self.neuronLayers[0].neuronBiases]
+        nextInput = self.neuronLayers[0].neuronBiases
         for i in range(1, len(self.neuronLayers)):
-            nextInput = self.neuronLayers[i].activationFunction(self.weightLayers[i] @ nextInput + self.neuronLayers[i].neuronBiases)
+            nextInput = self.neuronLayers[i].activationFunction(self.weightLayers[i].weights @ nextInput + self.neuronLayers[i].neuronBiases)
             self.layerOutputs.append(nextInput)
-        return nextInput
+        return (nextInput, self.layerOutputs)
 
     def loss(self, prediction, target):
         if target < 0 or target >= prediction.dim[0]:
@@ -136,18 +147,31 @@ class NeuralNetwork:
         return -1 * math.log(prediction.matrix[target][0])
     
     def backpropogate(self, prediction, target):
-        delta_values  = []
+        self.delta_values  = []
         for layer in reversed(range(1, len(self.neuronLayers))):
-            if type(layer) == OutputLayer:
-                delta_values.append(prediction - Matrix(f"{prediction.dim[0]}x1", *[1 if i == target else 0 for i in range(prediction.dim[0])]))
-            elif type(layer) == MiddleLayer:
+            if isinstance(self.neuronLayers[layer], OutputLayer):
+                self.delta_values.append(prediction - Matrix(f"{prediction.dim[0]}x1", *[1 if i == target else 0 for i in range(prediction.dim[0])]))
+            elif isinstance(self.neuronLayers[layer], MiddleLayer):
                 # find the delta value for a middle layer that uses sigmoid activation function
-                prev_delta = delta_values[-1]
+                prev_delta = self.delta_values[-1]
                 prev_weights = self.weightLayers[layer + 1].weights
-                layer_output = self.layerOutputs[layer - 1]
+                layer_output = self.layerOutputs[layer]
                 delta = (prev_weights.transpose() @ prev_delta) * sigmoid_derivative(layer_output)
-                delta_values.append(delta)
-        delta_values.reverse()
+                self.delta_values.append(delta)
+        self.delta_values.reverse()
+        return self.delta_values
+
+    def gradients(self):
+        gradients = []
+        for layer in range(1, len(self.neuronLayers)):
+            gradient = self.delta_values[layer - 1] @ self.layerOutputs[layer - 1].transpose()
+            gradients.append(gradient)
+        return gradients
+
+    def update_weights(self, gradients, learning_rate):
+        for layer in range(1, len(self.neuronLayers)):
+            self.weightLayers[layer].weights = self.weightLayers[layer].weights - gradients[layer - 1].scalar_multiply(learning_rate)
+            self.neuronLayers[layer].neuronBiases = self.neuronLayers[layer].neuronBiases - self.delta_values[layer - 1].scalar_multiply(learning_rate)
 
 
 def sigmoid(arr):
