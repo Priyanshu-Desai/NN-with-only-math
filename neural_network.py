@@ -96,33 +96,54 @@ class InputLayer():
         self.neuronBiases = Matrix(f"{neurons}x1", *[0 for _ in range(neurons)])
 
 class MiddleLayer():
-    def __init__(self, neurons):
+    def __init__(self, neurons, *biases):
         self.activationFunction = sigmoid
-        self.neuronBiases = Matrix(f"{neurons}x1", *[random.uniform(-1, 1) for _ in range(neurons)])
+        self.neuronBiases = Matrix(f"{neurons}x1", *biases)
 
 class OutputLayer():
-    def __init__(self, neurons):
+    def __init__(self, neurons, *biases):
         self.activationFunction = softmax
-        self.neuronBiases = Matrix(f"{neurons}x1", *[random.uniform(-1, 1) for _ in range(neurons)])
+        self.neuronBiases = Matrix(f"{neurons}x1", *biases)
 
 class WeightLayer:
-    def __init__(self, inputLayer, outputLayer):
-        self.weights = Matrix(f"{outputLayer.neuronBiases.dim[0]}x{inputLayer.neuronBiases.dim[0]}", *[random.uniform(-1, 1) for _ in range(outputLayer.neuronBiases.dim[0] * inputLayer.neuronBiases.dim[0])])
+    def __init__(self, inputLayer, outputLayer, *weights):
+        self.weights = Matrix(f"{outputLayer.neuronBiases.dim[0]}x{inputLayer.neuronBiases.dim[0]}", *weights)
 
 # the nn
 class NeuralNetwork:
-    def __init__(self, *layers):
+    # JSON input
+    # {
+    #     1: {
+    #         type: 'input',
+    #         size: 3
+    #     }
+    #     2: {
+    #         type: 'weights',
+    #         size: [3, 4],
+    #         weights: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2]
+    #     }
+    #     3: {
+    #         type: 'output',
+    #         size: 4,
+    #         biases: [0, 0, 0, 0]
+    #     }
+    # }
+    def __init__(self, layerConfig):
         self.neuronLayers = []
         self.weightLayers = [None]
-        for layer in layers:
-            if layer[0] == 'input':
-                self.neuronLayers.append(InputLayer(layer[1]))
-            elif layer[0] == 'middle':
-                self.weightLayers.append(WeightLayer(self.neuronLayers[-1], MiddleLayer(layer[1])))
-                self.neuronLayers.append(MiddleLayer(layer[1]))
-            elif layer[0] == 'output':
-                self.weightLayers.append(WeightLayer(self.neuronLayers[-1], OutputLayer(layer[1])))
-                self.neuronLayers.append(OutputLayer(layer[1]))
+        for layer in layerConfig:
+            layerType = layer['type']
+            layerSize = layer['size'] if 'size' in layer else None
+            layerBiases = layer['biases'] if 'biases' in layer else None
+            layerWeights = layer['weights'] if 'weights' in layer else None
+            if layerType == 'input':
+                self.neuronLayers.append(InputLayer(layerSize))
+            elif layerType == 'middle':
+                self.neuronLayers.append(MiddleLayer(layerSize, *layerBiases))
+            elif layerType == 'output':
+                self.neuronLayers.append(OutputLayer(layerSize, *layerBiases))
+            elif layerType == 'weight':
+                self.weightLayers.append(WeightLayer(layerSize[0], layerSize[1], *layerWeights))
         self.layerOutputs = []
         self.delta_values = []
 
@@ -172,6 +193,35 @@ class NeuralNetwork:
         for layer in range(1, len(self.neuronLayers)):
             self.weightLayers[layer].weights = self.weightLayers[layer].weights - gradients[layer - 1].scalar_multiply(learning_rate)
             self.neuronLayers[layer].neuronBiases = self.neuronLayers[layer].neuronBiases - self.delta_values[layer - 1].scalar_multiply(learning_rate)
+
+    def save(self):
+        data = {}
+        for i, layer in enumerate(self.neuronLayers):
+            if isinstance(layer, InputLayer):
+                data[i] = {
+                    'type': 'input',
+                    'size': layer.neuronBiases.dim[0],
+                    'biases': layer.neuronBiases.flatten()
+                }
+            elif isinstance(layer, MiddleLayer):
+                data[i] = {
+                    'type': 'middle',
+                    'size': layer.neuronBiases.dim[0],
+                    'biases': layer.neuronBiases.flatten()
+                }
+            elif isinstance(layer, OutputLayer):
+                data[i] = {
+                    'type': 'output',
+                    'size': layer.neuronBiases.dim[0],
+                    'biases': layer.neuronBiases.flatten()
+                }
+        for i, weight_layer in enumerate(self.weightLayers[1:], start=1):
+            data[i] = {
+                'type': 'weight',
+                'size': [weight_layer.weights.dim[0], weight_layer.weights.dim[1]],
+                'weights': weight_layer.weights.flatten()
+            }
+        return data
 
 
 def sigmoid(arr):
