@@ -1,5 +1,4 @@
 import math
-import random
 
 # Simple neural network implemented using only math and basic data structures.
 # Provides a lightweight Matrix helper class, simple layer types, and a
@@ -207,7 +206,7 @@ class NeuralNetwork:
             weight_gradients.append(gradient)
         return (weight_gradients, bias_gradients)
 
-    def update_weights(self, weight_gradients, bias_gradients, learning_rate):
+    def update(self, weight_gradients, bias_gradients, learning_rate):
         for layer in range(1, len(self.neuronLayers)):
             self.weightLayers[layer].weights = self.weightLayers[layer].weights - weight_gradients[layer - 1].scalar_multiply(learning_rate)
             self.neuronLayers[layer].neuronBiases = self.neuronLayers[layer].neuronBiases - bias_gradients[layer - 1].scalar_multiply(learning_rate)
