@@ -74,8 +74,6 @@ class Matrix:
             print(row) 
 
     def flatten(self):
-        if self.dim[1] != 1:
-            raise ValueError("Matrix must be a column vector (n x 1) to flatten.")
         return [item for sublist in self.matrix for item in sublist]
 
     def transpose(self):
@@ -164,7 +162,7 @@ class NeuralNetwork:
         self.delta_values = []
 
 
-    def setInput(self, inputValues):
+    def setInput(self, *inputValues):
         if len(inputValues) != self.neuronLayers[0].neuronBiases.dim[0]:
             raise ValueError("Input values must match the number of neurons in the input layer.")
         self.neuronLayers[0].neuronBiases = Matrix(f"{len(inputValues)}x1", *inputValues)

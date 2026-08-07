@@ -25,8 +25,8 @@ except FileNotFoundError:
             'size': 784,
         },
         '1': {
-            'type': 'weights',
-            'size': [784, 128],
+            'type': 'weight',
+            'size': [128, 784],
             'weights': [random.uniform(-1, 1) for _ in range(784 * 128)],
         },
         '2': {
@@ -35,8 +35,8 @@ except FileNotFoundError:
             'biases': [random.uniform(-1, 1) for _ in range(128)],
         },
         '3': {
-            'type': 'weights',
-            'size': [128, 10],
+            'type': 'weight',
+            'size': [10, 128],
             'weights': [random.uniform(-1, 1) for _ in range(128 * 10)],
         },
         '4': {
@@ -75,8 +75,8 @@ for epoch in range(epochs):
         print(f"Starting batch {current_batch}/{total_batches} of epoch {current_epoch}...")
 
         # hold weights and biases gradients
-        batch_weight_grads = []
-        batch_bias_grads = []
+        batch_weight_grads = None
+        batch_bias_grads = None
 
         total_batch_loss = 0.0
 
@@ -89,7 +89,7 @@ for epoch in range(epochs):
             image_tensor = batch_images[i]
 
             # flatten the image tensor to a 1D vector
-            flat_image = image_tensor.view(-1).toList()
+            flat_image = image_tensor.view(-1).tolist()
 
             # convert the flat_image to matrix
             input_matrix = nn.Matrix("784x1", *flat_image)
@@ -97,29 +97,32 @@ for epoch in range(epochs):
             # get the label for the image
             label = batch_labels[i].item()
 
-            # convert the label to a one-hot encoded vector
-            label_vector = [0] * 10
-            label_vector[label] = 1
-            label_matrix = nn.Matrix("10x1", *label_vector)
-
             # train
-            ai.setInput(input_matrix)
+            ai.setInput(*input_matrix.flatten())
             result, _ = ai.forward()
-            prediction = result.toList().index(max(result.toList()))
-            loss = ai.loss(result, label_matrix)
-            deltas = ai.backpropogate(result, label_matrix)
+            prediction = result.flatten().index(max(result.flatten()))
+            loss = ai.loss(result, label)
+            deltas = ai.backpropogate(result, label)
             weight_grads, bias_grads = ai.gradients()
-            batch_weight_grads.append(weight_grads)
-            batch_bias_grads.append(bias_grads)
 
+            # add to running total of gradients
+            if batch_weight_grads is None:
+                batch_weight_grads = weight_grads
+                batch_bias_grads = bias_grads
+            else:
+                for layer_idx in range(len(weight_grads)):
+                    batch_weight_grads[layer_idx] = batch_weight_grads[layer_idx] + weight_grads[layer_idx]
+                    batch_bias_grads[layer_idx] = batch_bias_grads[layer_idx] + bias_grads[layer_idx]
+
+            # add to running total of loss
             total_batch_loss += loss
             total_epoch_loss += loss
 
             print(f"Epoch: {current_epoch}/{epochs}, Batch: {current_batch}/{total_batches}, Image: {current_image}/{batch_size}, Prediction: {prediction}, Label: {label}, Loss: {loss:.4f}")
 
         # average the gradients over the batch
-        avg_weight_grads = [sum(grads) / len(grads) for grads in zip(*batch_weight_grads)]
-        avg_bias_grads = [sum(grads) / len(grads) for grads in zip(*batch_bias_grads)]
+        avg_weight_grads = [grad.scalar_multiply(1 / batch_size) for grad in batch_weight_grads]
+        avg_bias_grads = [grad.scalar_multiply(1 / batch_size) for grad in batch_bias_grads]
 
         #average the loss over the batch
         avg_batch_loss = total_batch_loss / batch_size
